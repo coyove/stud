@@ -149,7 +149,7 @@ func (n *nodeBlock) maybeSplitChild(i int) bool {
 }
 
 // insert inserts an item into the subtree rooted at this node
-func (n *nodeBlock) insert(key uint128) error {
+func (n *nodeBlock) insert(key uint128, keystr string, r io.Reader) error {
 	i, found := n.find(key)
 	//log.Println(n.children, n.items, item, i, found)
 	if found {
@@ -157,7 +157,7 @@ func (n *nodeBlock) insert(key uint128) error {
 	}
 
 	if n.childrenSize == 0 {
-		p, err := n._super.writeMetadata(key)
+		p, err := n._super.writeMetadata(key, keystr, r)
 		if err != nil {
 			return err
 		}
@@ -182,7 +182,7 @@ func (n *nodeBlock) insert(key uint128) error {
 	if err != nil {
 		return err
 	}
-	return ch.insert(key)
+	return ch.insert(key, keystr, r)
 }
 
 func (n *nodeBlock) child(i int) (*nodeBlock, error) {

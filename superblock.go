@@ -40,24 +40,19 @@ type SuperBlock struct {
 	rootNode     int64
 	superHash    uint64
 
-	_fd         *os.File
-	_fdl        *os.File
-	_mmap       mmap.MMap
-	_cacheFds   chan *os.File
-	_filename   string
-	_dirtyNodes map[*nodeBlock]bool
-	_root       *nodeBlock
-	_lock       sync.RWMutex
-	_reader     io.Reader
-	_keystr     string
-	_flag       uint32
-	_maxFds     int16
-	_closed     bool
+	_fd, _fdl *os.File
+	_mmap     mmap.MMap
+	_cacheFds chan *os.File
+	_filename string
+	_root     *nodeBlock
+	_lock     sync.RWMutex
+	_closed   bool
 
 	// snapshots store the "stable" states of SuperBlock (and nodeBlock)
 	// when dirty nodes are about to sync, new states will go to pending snapshots,
 	// only when all dirty nodes are updated without errors, pending snapshots become stable snapshots
 	// if any error happened, all nodes revert back to last snapshots.
+	_dirtyNodes        map[*nodeBlock]bool
 	_snapshot          [superBlockSize]byte
 	_snapshotPending   [superBlockSize]byte
 	_snapshotChPending map[*nodeBlock][nodeBlockSize]byte
@@ -103,13 +98,13 @@ func (b *SuperBlock) sync() error {
 	return err
 }
 
-func (b *SuperBlock) Count() int {
-	return int(b.count)
-}
+func (b *SuperBlock) Count() int { return int(b.count) }
 
-func (b *SuperBlock) Size() int64 {
-	return b.size
-}
+func (b *SuperBlock) Size() int64 { return b.size }
+
+func (b *SuperBlock) FileSize() int64 { e, _ := b._fd.Seek(0, 2); return e }
+
+func (b *SuperBlock) Tail() int64 { return b.tailptr }
 
 func (b *SuperBlock) Close() error {
 	b._lock.Lock()
@@ -209,7 +204,7 @@ func (sb *SuperBlock) syncDirties() error {
 		}
 	}
 
-	// we have done writing the master snapshot
+	// we have done writing the master snapshot (WAL)
 	// if the above code failed, we are fine because we will directly revertDirties
 	// from now on we are entering the critical area,
 	// if the belowed code failed, we have to panic,
@@ -270,11 +265,7 @@ func (sb *SuperBlock) revertDirties() {
 	sb.revertToLastSnapshot()
 }
 
-func (sb *SuperBlock) writeMetadata(key uint128) (Metadata, error) {
-	if sb._reader == nil {
-		panic("wtf")
-	}
-
+func (sb *SuperBlock) writeMetadata(key uint128, keystr string, r io.Reader) (Metadata, error) {
 	if testCase1 {
 		return Metadata{}, testError
 	}
@@ -284,9 +275,9 @@ func (sb *SuperBlock) writeMetadata(key uint128) (Metadata, error) {
 		return Metadata{}, err
 	}
 
-	var keylen uint16 = uint16(len(sb._keystr))
+	var keylen uint16 = uint16(len(keystr))
 	if keylen > 8 {
-		if _, err := io.Copy(sb._fd, strings.NewReader(sb._keystr)); err != nil {
+		if _, err := io.Copy(sb._fd, strings.NewReader(keystr)); err != nil {
 			return Metadata{}, err
 		}
 	}
@@ -295,7 +286,7 @@ func (sb *SuperBlock) writeMetadata(key uint128) (Metadata, error) {
 	written := int64(0)
 	h := crc32.NewIEEE()
 	for {
-		nr, er := sb._reader.Read(buf)
+		nr, er := r.Read(buf)
 		if nr > 0 {
 			nw, ew := sb._fd.Write(buf[0:nr])
 			if nw > 0 {
@@ -357,12 +348,8 @@ func (sb *SuperBlock) Add(key string, r io.Reader) (err error) {
 		}
 	}()
 
-	sb._reader = r
-	sb._keystr = key
-	k := sb.hashString(key)
-
 	if sb.rootNode == 0 && sb._root == nil {
-		p, err := sb.writeMetadata(k)
+		p, err := sb.writeMetadata(sb.hashString(key), key, r)
 		if err != nil {
 			return err
 		}
@@ -390,7 +377,7 @@ func (sb *SuperBlock) Add(key string, r io.Reader) (err error) {
 		sb._root.markDirty()
 	}
 
-	if err := sb._root.insert(k); err != nil {
+	if err := sb._root.insert(sb.hashString(key), key, r); err != nil {
 		return err
 	}
 
@@ -403,6 +390,10 @@ SYNC:
 	return nil
 }
 
+// Get returns the Stream of the key
+// if it is not found, error would be ErrKeyNotFound
+// if it is found, Stream must be closed after used
+// Don't write "_, err := sb.Add()"
 func (sb *SuperBlock) Get(key string) (*Stream, error) {
 	sb._lock.RLock()
 	defer sb._lock.RUnlock()
