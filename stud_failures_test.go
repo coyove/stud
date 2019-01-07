@@ -15,11 +15,11 @@ func TestFailCase1(t *testing.T) {
 	}
 
 	for i := 0; i < maxItems; i++ {
-		f.Add(strconv.Itoa(i), genReader(int64(i)))
+		f.Create(strconv.Itoa(i), genReader(int64(i)))
 	}
 
 	testCase1 = true
-	f.Add("13739", genReader(int64(13739))) // will fail
+	f.Create("13739", genReader(int64(13739))) // will fail
 
 	if f.Count() != maxItems {
 		t.Error(f.Count())
@@ -30,7 +30,7 @@ func TestFailCase1(t *testing.T) {
 	}
 
 	for i := 0; i < maxItems; i++ {
-		v, _ := f.Get(strconv.Itoa(i))
+		v, _ := f.Open(strconv.Itoa(i))
 		vj := int64(binary.BigEndian.Uint64(v.ReadAllAndClose()))
 		if vj != int64(i) {
 			t.Error(vj, i)
@@ -47,7 +47,7 @@ func TestFailCase1(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	f.Add("13739", genReader(int64(13739))) // will fail
+	f.Create("13739", genReader(int64(13739))) // will fail
 	if f.Count() != 0 {
 		t.Error(f.Count())
 	}
@@ -70,7 +70,7 @@ func TestFailCase1_2(t *testing.T) {
 	}
 
 	testCase1 = true
-	f.Add("13739", genReader(int64(13739))) // will fail
+	f.Create("13739", genReader(int64(13739))) // will fail
 
 	if f.Count() != 0 {
 		t.Error(f.Count())
@@ -93,13 +93,13 @@ func TestFailCase2(t *testing.T) {
 	}
 
 	for i := 0; i < maxItems; i++ {
-		f.Add(strconv.Itoa(i), genReader(int64(i)))
+		f.Create(strconv.Itoa(i), genReader(int64(i)))
 	}
 
 	testCase2 = true
 	(func() {
 		defer func() { recover() }()
-		f.Add(strconv.Itoa(maxItems), genReader(0))
+		f.Create(strconv.Itoa(maxItems), genReader(0))
 	}())
 	testCase2 = false
 
@@ -115,12 +115,12 @@ func TestFailCase2(t *testing.T) {
 		}
 
 		for i := 0; i < maxItems; i++ {
-			v, _ := f.Get(strconv.Itoa(i))
+			v, _ := f.Open(strconv.Itoa(i))
 			if i != int(binary.BigEndian.Uint64(v.ReadAllAndClose())) {
 				t.Error(i)
 			}
 		}
-		f.Add("1234567890", genReader(1234567890))
+		f.Create("1234567890", genReader(1234567890))
 		f.Close()
 	}
 
@@ -137,14 +137,14 @@ func TestFailCase3(t *testing.T) {
 
 	m := map[int]bool{}
 	for i := 0; i < COUNT; i++ {
-		f.Add(strconv.Itoa(i), genReader(int64(i)))
+		f.Create(strconv.Itoa(i), genReader(int64(i)))
 		m[i] = true
 	}
 
 	testCase3 = true
 	(func() {
 		defer func() { recover() }()
-		f.Add("case3", genReader(0))
+		f.Create("case3", genReader(0))
 	}())
 	testCase3 = false
 
@@ -174,7 +174,7 @@ func TestFailCase3(t *testing.T) {
 		}
 
 		m[COUNT*2] = true
-		f.Add(strconv.Itoa(COUNT*2), genReader(int(COUNT*2)))
+		f.Create(strconv.Itoa(COUNT*2), genReader(int(COUNT*2)))
 
 		f.Close()
 	}
@@ -189,13 +189,13 @@ func TestFailCase4(t *testing.T) {
 	}
 
 	for i := 0; i < maxItems; i++ {
-		f.Add(strconv.Itoa(i), genReader(int64(i)))
+		f.Create(strconv.Itoa(i), genReader(int64(i)))
 	}
 
 	testCase4 = true
 	(func() {
 		defer func() { recover() }()
-		f.Add(strconv.Itoa(maxItems), genReader(0))
+		f.Create(strconv.Itoa(maxItems), genReader(0))
 	}())
 
 	f.Close()
@@ -212,7 +212,7 @@ func TestFailCase4(t *testing.T) {
 	}
 
 	for i := 0; i < maxItems; i++ {
-		v, _ := f.Get(strconv.Itoa(i))
+		v, _ := f.Open(strconv.Itoa(i))
 		if i != int(binary.BigEndian.Uint64(v.ReadAllAndClose())) {
 			t.Error(i)
 		}
@@ -229,7 +229,7 @@ func TestFailCaseCorruptedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 0; i < 256; i++ {
-		f.Add(strconv.Itoa(i), genReader(int64(i)))
+		f.Create(strconv.Itoa(i), genReader(int64(i)))
 	}
 	f.Close()
 
@@ -243,7 +243,7 @@ func TestFailCaseCorruptedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	x, _ := f.Get("255")
+	x, _ := f.Open("255")
 	_, err = ioutil.ReadAll(x)
 	if err == nil {
 		t.Fatal("data should be corrupted")

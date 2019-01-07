@@ -42,7 +42,7 @@ type nodeBlock struct {
 }
 
 func (s *nodeBlock) markDirty() {
-	s._super.addDirtyNode(s)
+	s._super._dirtyNodes[s] = true
 }
 
 // insertAt inserts a value into the given index, pushing all subsequent values

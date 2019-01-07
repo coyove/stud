@@ -65,10 +65,6 @@ func (b *SuperBlock) newNode() *nodeBlock {
 	}
 }
 
-func (b *SuperBlock) addDirtyNode(n *nodeBlock) {
-	b._dirtyNodes[n] = true
-}
-
 func (b *SuperBlock) revertToLastSnapshot() {
 	*(*[superBlockSize]byte)(unsafe.Pointer(b)) = b._snapshot
 	b._root = nil
@@ -164,7 +160,7 @@ func (sb *SuperBlock) Walk(filter func(Metadata) bool, callback func(key string,
 	return sb._root.iterate(filter, callback, 0)
 }
 
-// syncDirties shall only be called by Add()/Flag()
+// syncDirties shall only be called by Create()/Flag()
 func (sb *SuperBlock) syncDirties() error {
 	if sb._root == nil || len(sb._dirtyNodes) == 0 {
 		// nothing in the tree
@@ -331,7 +327,7 @@ func (sb *SuperBlock) writeMetadata(key uint128, keystr string, r io.Reader) (Me
 	return p, nil
 }
 
-func (sb *SuperBlock) Add(key string, r io.Reader) (err error) {
+func (sb *SuperBlock) Create(key string, r io.Reader) (err error) {
 	sb._lock.Lock()
 	defer sb._lock.Unlock()
 
@@ -393,8 +389,8 @@ SYNC:
 // Get returns the Stream of the key
 // if it is not found, error would be ErrKeyNotFound
 // if it is found, Stream must be closed after used
-// Don't write "_, err := sb.Add()"
-func (sb *SuperBlock) Get(key string) (*Stream, error) {
+// Don't write "_, err := sb.Open()"
+func (sb *SuperBlock) Open(key string) (*Stream, error) {
 	sb._lock.RLock()
 	defer sb._lock.RUnlock()
 

@@ -49,12 +49,12 @@ func TestOpenStud(t *testing.T) {
 
 	r := rand.New()
 	for i := 0; i < COUNT; i++ {
-		f.Add(strconv.Itoa(i), genReader(r))
+		f.Create(strconv.Itoa(i), genReader(r))
 		fmt.Print("\r", i)
 	}
 	fmt.Print("\r")
 
-	f.Add("137393731", genReader(marker))
+	f.Create("137393731", genReader(marker))
 	f.Close()
 
 	f, err = Open("map", nil)
@@ -62,13 +62,13 @@ func TestOpenStud(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	v, _ := f.Get("137393731")
+	v, _ := f.Open("137393731")
 	buf := v.ReadAllAndClose()
 	if !bytes.Equal(buf, marker) {
 		t.Error(buf)
 	}
 
-	if v, err := f.Get(strconv.Itoa(COUNT / 2)); err != nil {
+	if v, err := f.Open(strconv.Itoa(COUNT / 2)); err != nil {
 		t.Error(err)
 	} else {
 		v.Close()
@@ -86,7 +86,7 @@ func TestOpenStudSmallMMap(t *testing.T) {
 	}
 
 	for i := 0; i < COUNT; i++ {
-		f.Add(strconv.Itoa(i), genReader(i))
+		f.Create(strconv.Itoa(i), genReader(i))
 		fmt.Print("\r", i)
 	}
 	fmt.Print("\r")
@@ -118,7 +118,7 @@ func TestOpenStudLongKey(t *testing.T) {
 	}
 
 	for i := 0; i < COUNT; i++ {
-		f.Add(strconv.Itoa(i)+".12345678", genReader(i))
+		f.Create(strconv.Itoa(i)+".12345678", genReader(i))
 		fmt.Print("\r", i)
 	}
 	fmt.Print("\r")
@@ -148,7 +148,7 @@ func TestOpenStudFlag(t *testing.T) {
 	}
 
 	for i := 0; i < COUNT; i++ {
-		f.Add(strconv.Itoa(i), genReader(i))
+		f.Create(strconv.Itoa(i), genReader(i))
 		f.Flag(strconv.Itoa(i), func(uint64) uint64 { return uint64(i) })
 	}
 	f.Close()
@@ -180,7 +180,7 @@ func TestOpenStud2(t *testing.T) {
 	}
 
 	for i := 0; i < 256; i++ {
-		f.Add(strconv.Itoa(i), genReader(int64(i)))
+		f.Create(strconv.Itoa(i), genReader(int64(i)))
 		if f.Count() != i+1 {
 			t.Error("Count() failed")
 		}
@@ -188,7 +188,7 @@ func TestOpenStud2(t *testing.T) {
 			t.Error("Size() failed")
 		}
 		for j := 0; j < i; j++ {
-			v, _ := f.Get(strconv.Itoa(j))
+			v, _ := f.Open(strconv.Itoa(j))
 			buf := v.ReadAllAndClose()
 			vj := int64(binary.BigEndian.Uint64(buf))
 
@@ -214,7 +214,7 @@ func TestOpenStud2Random(t *testing.T) {
 	for i := 0; i < COUNT*2; i++ {
 		ir := int(r.Uint64())
 		si := strconv.Itoa(ir)
-		f.Add(si, genReader(int64(ir)))
+		f.Create(si, genReader(int64(ir)))
 		m[si] = ir
 
 		if r.Intn(5) == 1 {
@@ -238,7 +238,7 @@ func TestOpenStud2Random(t *testing.T) {
 	}
 
 	for k, vi := range m {
-		v2, _ := f.Get(k)
+		v2, _ := f.Open(k)
 		v2i := int(binary.BigEndian.Uint64(v2.ReadAllAndClose()))
 		if v2i != vi {
 			t.Error(v2i, vi)
@@ -258,7 +258,7 @@ func BenchmarkStud(b *testing.B) {
 
 	r := rand.New()
 	for i := 0; i < b.N; i++ {
-		v, _ := f.Get(strconv.Itoa(r.Intn(COUNT)) + "12345678")
+		v, _ := f.Open(strconv.Itoa(r.Intn(COUNT)) + "12345678")
 		if v != nil {
 			v.ReadAllAndClose()
 		}
@@ -321,7 +321,7 @@ func TestMain(m *testing.M) {
 
 	start = time.Now()
 	for i := 0; i < COUNT; i++ {
-		f.Add(strconv.Itoa(i)+"12345678", genReader(rbuf))
+		f.Create(strconv.Itoa(i)+"12345678", genReader(rbuf))
 		fmt.Print("\rStud:", i)
 	}
 	fmt.Print("\r")

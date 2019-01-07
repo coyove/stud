@@ -18,14 +18,14 @@ func TestStudConcurrentRead(t *testing.T) {
 	}
 
 	for i := 0; i < COUNT; i++ {
-		f.Add(strconv.Itoa(i), genReader(int64(i)))
+		f.Create(strconv.Itoa(i), genReader(int64(i)))
 	}
 
 	wg := sync.WaitGroup{}
 	for i := 0; i < COUNT; i++ {
 		wg.Add(1)
 		go func(i int) {
-			v, _ := f.Get(strconv.Itoa(i))
+			v, _ := f.Open(strconv.Itoa(i))
 			buf := v.ReadAllAndClose()
 			vj := int64(binary.BigEndian.Uint64(buf))
 
@@ -52,7 +52,7 @@ func BenchmarkStudConcurrentRead(b *testing.B) {
 	r := rand.New()
 	b.RunParallel(func(b *testing.PB) {
 		for b.Next() {
-			v, _ := f.Get(strconv.Itoa(r.Intn(COUNT)) + "12345678")
+			v, _ := f.Open(strconv.Itoa(r.Intn(COUNT)) + "12345678")
 			if v != nil {
 				v.ReadAllAndClose()
 			}
