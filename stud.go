@@ -22,6 +22,7 @@ var (
 	testCase2  bool // Simulate: fatal error: sync dirties to disk, incomplete snapshot
 	testCase3  bool // Simulate: fatal error: sync dirties to disk
 	testCase4  bool // Simulate: failed to recover snapshot
+	testCase5  bool // Simulate: error when copying data to disk, some data have been written successfully
 	testError  = fmt.Errorf("test")
 )
 

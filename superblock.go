@@ -314,6 +314,9 @@ func (sb *SuperBlock) writeMetadata(key uint128, keystr string, r io.Reader) (Me
 			}
 			break
 		}
+		if testCase5 {
+			return Metadata{}, testError
+		}
 	}
 	if err != nil {
 		return Metadata{}, err

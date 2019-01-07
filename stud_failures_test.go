@@ -223,6 +223,33 @@ func TestFailCase4(t *testing.T) {
 
 }
 
+func TestFailCase5(t *testing.T) {
+	f, err := Open("map", nil)
+	if f == nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < COUNT; i++ {
+		f.Create(strconv.Itoa(i), genReader(i))
+	}
+
+	oldtailptr := int64(f.mmapSize) + COUNT*8
+
+	testCase5 = true
+	f.Create("xxx", genReader("xxx"))
+	testCase5 = false
+
+	f.Close()
+
+	f, err = Open("map", nil)
+	if f.tailptr != oldtailptr {
+		t.Error("Tail not correct")
+	}
+
+	f.Close()
+	os.Remove("map")
+}
+
 func TestFailCaseCorruptedFile(t *testing.T) {
 	f, err := Open("map", nil)
 	if f == nil {
