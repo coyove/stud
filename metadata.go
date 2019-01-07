@@ -1,16 +1,39 @@
 package stud
 
-import "time"
+import (
+	"fmt"
+	"time"
+	"unsafe"
+)
 
 const itemSize = 48
 
 type Metadata struct {
 	key    uint128
 	offset int64
-	size   uint64 // 16bit key length + 48bit size
+	size   uint64 // 16bit key length + 48bit data length
 	tstamp uint32
 	crc32  uint32
 	flag   uint64
+}
+
+func (m *Metadata) Pos() (int64, int64) {
+	if m.KeyLen() > 8 {
+		return m.offset + int64(m.KeyLen()), m.BufLen()
+	}
+	return m.offset, m.BufLen()
+}
+
+func (m *Metadata) ShortName() string {
+	ln := m.KeyLen()
+	x := *(*[16]byte)(unsafe.Pointer(&m.key))
+	if ln > 8 {
+		// the key is stored elsewhere, for performance reason we won't read them
+		return fmt.Sprintf("%x", x)
+	}
+	keybuf := make([]byte, ln)
+	copy(keybuf, x[:ln])
+	return string(keybuf)
 }
 
 func (m *Metadata) KeyLen() uint16 { return uint16(m.size >> 48) }

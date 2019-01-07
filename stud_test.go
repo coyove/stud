@@ -147,8 +147,10 @@ func TestOpenStudFlag(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	m := map[string]bool{}
 	for i := 0; i < COUNT; i++ {
 		f.Create(strconv.Itoa(i), genReader(i))
+		m[strconv.Itoa(i)] = true
 		f.Flag(strconv.Itoa(i), func(uint64) uint64 { return uint64(i) })
 	}
 	f.Close()
@@ -158,7 +160,10 @@ func TestOpenStudFlag(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	f.Walk(nil, func(k string, v *Stream) error {
+	f.Walk(func(md Metadata) bool {
+		delete(m, md.ShortName())
+		return true
+	}, func(k string, v *Stream) error {
 		x := binary.BigEndian.Uint64(v.ReadAllAndClose())
 		if k != strconv.Itoa(int(x)) {
 			t.Error(k)
@@ -168,6 +173,10 @@ func TestOpenStudFlag(t *testing.T) {
 		}
 		return nil
 	})
+
+	if len(m) > 0 {
+		t.Error("Metadata filter failed")
+	}
 
 	f.Close()
 	os.Remove("map")
@@ -267,16 +276,30 @@ func BenchmarkStud(b *testing.B) {
 	f.Close()
 }
 
+func BenchmarkStudCached(b *testing.B) {
+	f, err := Open("test", &Options{CacheSize: 1024 * 1024 * 16})
+	if f == nil {
+		b.Fatal(err)
+	}
+
+	r := rand.New()
+	for i := 0; i < b.N; i++ {
+		f.Get(strconv.Itoa(r.Intn(COUNT)) + "12345678")
+	}
+
+	f.Close()
+}
+
 func BenchmarkBolt(b *testing.B) {
 	db, _ := bolt.Open("bolt", 0666, nil)
 	r := rand.New()
-	for i := 0; i < b.N; i++ {
-		db.View(func(tx *bolt.Tx) error {
+	db.View(func(tx *bolt.Tx) error {
+		for i := 0; i < b.N; i++ {
 			b := tx.Bucket([]byte("main"))
 			b.Get([]byte(strconv.Itoa(r.Intn(COUNT)) + "12345678"))
-			return nil
-		})
-	}
+		}
+		return nil
+	})
 
 	db.Close()
 }

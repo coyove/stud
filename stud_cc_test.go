@@ -44,7 +44,7 @@ func TestStudConcurrentRead(t *testing.T) {
 }
 
 func BenchmarkStudConcurrentRead(b *testing.B) {
-	f, err := Open("test", &Options{MaxFds: 4})
+	f, err := Open("test", &Options{MaxFds: 4, CacheSize: 1024 * 1024 * 16})
 	if f == nil {
 		b.Fatal(err)
 	}
@@ -52,17 +52,14 @@ func BenchmarkStudConcurrentRead(b *testing.B) {
 	r := rand.New()
 	b.RunParallel(func(b *testing.PB) {
 		for b.Next() {
-			v, _ := f.Open(strconv.Itoa(r.Intn(COUNT)) + "12345678")
-			if v != nil {
-				v.ReadAllAndClose()
-			}
+			f.Get(strconv.Itoa(r.Intn(COUNT)) + "12345678")
 		}
 	})
 
 	f.Close()
 }
 
-func BenchmarkOSConcurrentRead(b *testing.B) {
+func BenchmarkNativeConcurrentRead(b *testing.B) {
 	r := rand.New()
 	b.RunParallel(func(b *testing.PB) {
 		for b.Next() {

@@ -11,6 +11,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/coyove/common/lru"
 	"github.com/coyove/common/rand"
 	mmap "github.com/edsrzf/mmap-go"
 )
@@ -62,6 +63,7 @@ type Options struct {
 	MaxFds      int
 	MMapSize    int
 	InitSize    int
+	CacheSize   int
 	ForceCreate bool
 }
 
@@ -213,8 +215,10 @@ func Open(path string, opt *Options) (_sb *SuperBlock, _err error) {
 
 	sb._snapshot = *(*[superBlockSize]byte)(unsafe.Pointer(sb))
 	sb._snapshotChPending = map[*nodeBlock][nodeBlockSize]byte{}
-	maxFds := opt.MaxFds
-	sb._cacheFds = make(chan *os.File, maxFds)
+	sb._cacheFds = make(chan *os.File, opt.MaxFds)
+	if opt.CacheSize > 0 {
+		sb._cacheBytes = lru.NewCache(int64(opt.CacheSize))
+	}
 	return sb, nil
 }
 

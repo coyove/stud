@@ -13,6 +13,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/coyove/common/lru"
 	mmap "github.com/edsrzf/mmap-go"
 )
 
@@ -40,13 +41,14 @@ type SuperBlock struct {
 	rootNode     int64
 	superHash    uint64
 
-	_fd, _fdl *os.File
-	_mmap     mmap.MMap
-	_cacheFds chan *os.File
-	_filename string
-	_root     *nodeBlock
-	_lock     sync.RWMutex
-	_closed   bool
+	_fd, _fdl   *os.File
+	_mmap       mmap.MMap
+	_cacheFds   chan *os.File
+	_cacheBytes *lru.Cache
+	_filename   string
+	_root       *nodeBlock
+	_lock       sync.RWMutex
+	_closed     bool
 
 	// snapshots store the "stable" states of SuperBlock (and nodeBlock)
 	// when dirty nodes are about to sync, new states will go to pending snapshots,
@@ -94,14 +96,19 @@ func (b *SuperBlock) sync() error {
 	return err
 }
 
+// Count returns the count of keys stored
 func (b *SuperBlock) Count() int { return int(b.count) }
 
+// Size returns the total size of all data stored in bytes
 func (b *SuperBlock) Size() int64 { return b.size }
 
+// FileSize returns the actual size of stud in bytes
 func (b *SuperBlock) FileSize() int64 { e, _ := b._fd.Seek(0, 2); return e }
 
+// Tail returns the tail pointer position
 func (b *SuperBlock) Tail() int64 { return b.tailptr }
 
+// Close closes stud
 func (b *SuperBlock) Close() error {
 	b._lock.Lock()
 	defer b._lock.Unlock()
@@ -141,7 +148,10 @@ CLOSE_CACHE:
 	return nil
 }
 
-func (sb *SuperBlock) Walk(filter func(Metadata) bool, callback func(key string, data *Stream) error) error {
+// Walk interates all data stored in stud
+// If filter function returns false, then callback function will not be called (no Stream will open)
+// After callback, the Stream will be closed automatically
+func (sb *SuperBlock) Walk(filter func(Metadata) bool, callback func(string, *Stream) error) error {
 	sb._lock.RLock()
 	defer sb._lock.RUnlock()
 
@@ -327,6 +337,11 @@ func (sb *SuperBlock) writeMetadata(key uint128, keystr string, r io.Reader) (Me
 	return p, nil
 }
 
+// Create creates the key and copies the content from r into it
+// The max length of the key is 65535, and if it already existed, ErrKeyExisted will be returned
+// The max size of the data is 256TB
+// Uses of keys shorter than 8 bytes (including 8) are recommended
+// This method may panic. If you recover, SueprBlock shall not be used any more
 func (sb *SuperBlock) Create(key string, r io.Reader) (err error) {
 	sb._lock.Lock()
 	defer sb._lock.Unlock()
@@ -386,65 +401,11 @@ SYNC:
 	return nil
 }
 
-// Get returns the Stream of the key
-// if it is not found, error would be ErrKeyNotFound
-// if it is found, Stream must be closed after used
-// Don't write "_, err := sb.Open()"
-func (sb *SuperBlock) Open(key string) (*Stream, error) {
-	sb._lock.RLock()
-	defer sb._lock.RUnlock()
-
-	load := func(node Metadata) (*Stream, error) {
-		d := &Stream{_super: sb}
-		if err := d.open(); err != nil {
-			return nil, err
-		}
-
-		if _, err := d._fd.Seek(node.offset, 0); err != nil {
-			return nil, err
-		}
-
-		if node.KeyLen() > 8 {
-			ln := int64(node.KeyLen())
-			if _, err := d._fd.Seek(ln, os.SEEK_CUR); err != nil {
-				return nil, err
-			}
-		}
-
-		d.h = crc32.NewIEEE()
-		d.Metadata = node
-		d.remaining = int(node.BufLen())
-		return d, nil
-	}
-
-	k := sb.hashString(key)
-
-	var err error
-	if sb.rootNode == 0 && sb._root == nil {
-		return nil, ErrKeyNotFound
-	}
-
-	if sb.rootNode != 0 && sb._root == nil {
-		sb._root, err = sb.loadNodeBlock(sb.rootNode)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	node, err := sb._root.getOrFlag(k, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	//	sb._cache.Add(key, node)
-	return load(node)
-}
-
-func (sb *SuperBlock) Flag(key string, callback func(uint64) uint64) (uint64, error) {
+// Flag flags the key using the callback function
+// This method may panic. If you recover, SueprBlock shall not be used any more
+func (sb *SuperBlock) Flag(key string, callback func(oldFlag uint64) (newFlag uint64)) (uint64, error) {
 	sb._lock.Lock()
 	defer sb._lock.Unlock()
-
-	k := sb.hashString(key)
 
 	var err error
 	if sb.rootNode == 0 && sb._root == nil {
@@ -458,7 +419,7 @@ func (sb *SuperBlock) Flag(key string, callback func(uint64) uint64) (uint64, er
 		}
 	}
 
-	node, err := sb._root.getOrFlag(k, callback)
+	node, err := sb._root.getOrFlag(sb.hashString(key), callback)
 	if err != nil {
 		return 0, err
 	}
