@@ -24,6 +24,13 @@ var (
 	testCase4  bool // Simulate: failed to recover snapshot
 	testCase5  bool // Simulate: error when copying data to disk, some data have been written successfully
 	testError  = fmt.Errorf("test")
+	testPtr    int
+	testNoLock bool
+	testPanic  = func(i int) {
+		if i == testPtr {
+			panic("test")
+		}
+	}
 )
 
 var (
@@ -104,7 +111,7 @@ func Open(path string, opt *Options) (_sb *SuperBlock, _err error) {
 	}
 
 	fl, err := os.OpenFile(path+".lock", os.O_CREATE|os.O_EXCL, 0600)
-	if err != nil {
+	if err != nil && !testNoLock {
 		return nil, err
 	}
 
@@ -269,6 +276,9 @@ func (d *Stream) open() error {
 		d._fd, err = os.OpenFile(d._super._filename, os.O_RDONLY, 0666)
 		return err
 	}
+
+	// preserve this line for fuzzy test
+	return nil
 }
 
 func (d *Stream) Close() error {
@@ -284,6 +294,9 @@ func (d *Stream) Close() error {
 	default:
 		return d._fd.Close()
 	}
+
+	// preserve this line for fuzzy test
+	return nil
 }
 
 func (d *Stream) ReadAllAndClose() []byte {
