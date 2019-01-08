@@ -19,9 +19,9 @@ type Metadata struct {
 
 func (m *Metadata) Pos() (int64, int64) {
 	if m.KeyLen() > 8 {
-		return m.offset + int64(m.KeyLen()), m.BufLen()
+		return m.offset + int64(m.KeyLen()), m.Len()
 	}
-	return m.offset, m.BufLen()
+	return m.offset, m.Len()
 }
 
 func (m *Metadata) ShortName() string {
@@ -38,7 +38,7 @@ func (m *Metadata) ShortName() string {
 
 func (m *Metadata) KeyLen() uint16 { return uint16(m.size >> 48) }
 
-func (m *Metadata) BufLen() int64 { return int64(m.size & 0x0000ffffffffffff) }
+func (m *Metadata) Len() int64 { return int64(m.size & 0x0000ffffffffffff) }
 
 func (m *Metadata) Flag() uint64 { return m.flag }
 

@@ -340,6 +340,10 @@ func (sb *SuperBlock) writeMetadata(key uint128, keystr string, r io.Reader) (Me
 	return p, nil
 }
 
+func (sb *SuperBlock) Add(key string, value []byte) (err error) {
+	return sb.Create(key, bytes.NewReader(value))
+}
+
 // Create creates the key and copies the content from r into it
 // The max length of the key is 65535, and if it already existed, ErrKeyExisted will be returned
 // The max size of the data is 256TB

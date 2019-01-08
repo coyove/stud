@@ -323,7 +323,7 @@ func (n *nodeBlock) iterate(filter func(Metadata) bool, callback func(string, *S
 		d.Metadata = node
 		d.depth = depth
 		d.index = int(i)
-		d.remaining = int(node.BufLen())
+		d.remaining = int(node.Len())
 
 		callback(string(keyname), d)
 

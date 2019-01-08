@@ -33,7 +33,7 @@ func (sb *SuperBlock) Open(key string) (*Stream, error) {
 
 		d.h = crc32.NewIEEE()
 		d.Metadata = node
-		d.remaining = int(node.BufLen())
+		d.remaining = int(node.Len())
 		return d, nil
 	}
 
