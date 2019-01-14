@@ -288,35 +288,11 @@ func (sb *SuperBlock) writeMetadata(key uint128, keystr string, r io.Reader) (Me
 		}
 	}
 
-	buf := make([]byte, 32*1024)
-	written := int64(0)
 	h := crc32.NewIEEE()
-	for {
-		nr, er := r.Read(buf)
-		if nr > 0 {
-			nw, ew := sb._fd.Write(buf[0:nr])
-			if nw > 0 {
-				written += int64(nw)
-				h.Write(buf[0:nr])
-			}
-			if ew != nil {
-				err = ew
-				break
-			}
-			if nr != nw {
-				err = io.ErrShortWrite
-				break
-			}
-		}
-		if er != nil {
-			if er != io.EOF {
-				err = er
-			}
-			break
-		}
-		if testCase5 {
-			return Metadata{}, testError
-		}
+	w := io.MultiWriter(h, sb._fd)
+	written, err := io.Copy(w, r)
+	if testCase5 {
+		return Metadata{}, testError
 	}
 	if err != nil {
 		return Metadata{}, err

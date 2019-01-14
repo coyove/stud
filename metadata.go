@@ -42,7 +42,7 @@ func (m *Metadata) Len() int64 { return int64(m.size & 0x0000ffffffffffff) }
 
 func (m *Metadata) Flag() uint64 { return m.flag }
 
-func (m *Metadata) Created() time.Time { return time.Unix(int64(m.tstamp), 0) }
+func (m *Metadata) Timestamp() time.Time { return time.Unix(int64(m.tstamp), 0) }
 
 func (m *Metadata) Crc32() uint32 { return m.crc32 }
 
