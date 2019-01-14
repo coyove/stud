@@ -2,7 +2,6 @@ package stud
 
 import (
 	"fmt"
-	"time"
 	"unsafe"
 )
 
@@ -10,11 +9,11 @@ const itemSize = 48
 
 type Metadata struct {
 	key    uint128
+	next   int64 // linked list
 	offset int64
 	size   uint64 // 16bit key length + 48bit data length
-	tstamp uint32
 	crc32  uint32
-	flag   uint64
+	flag   uint32
 }
 
 func (m *Metadata) Pos() (int64, int64) {
@@ -40,9 +39,7 @@ func (m *Metadata) KeyLen() uint16 { return uint16(m.size >> 48) }
 
 func (m *Metadata) Len() int64 { return int64(m.size & 0x0000ffffffffffff) }
 
-func (m *Metadata) Flag() uint64 { return m.flag }
-
-func (m *Metadata) Created() time.Time { return time.Unix(int64(m.tstamp), 0) }
+func (m *Metadata) Flag() uint32 { return m.flag }
 
 func (m *Metadata) Crc32() uint32 { return m.crc32 }
 

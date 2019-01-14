@@ -3,14 +3,12 @@ package stud
 import (
 	"bytes"
 	"encoding/binary"
-	"hash/crc32"
 	"hash/fnv"
 	"io"
 	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
-	"time"
 	"unsafe"
 
 	"github.com/coyove/common/lru"
@@ -288,45 +286,15 @@ func (sb *SuperBlock) writeMetadata(key uint128, keystr string, r io.Reader) (Me
 		}
 	}
 
-	buf := make([]byte, 32*1024)
-	written := int64(0)
-	h := crc32.NewIEEE()
-	for {
-		nr, er := r.Read(buf)
-		if nr > 0 {
-			nw, ew := sb._fd.Write(buf[0:nr])
-			if nw > 0 {
-				written += int64(nw)
-				h.Write(buf[0:nr])
-			}
-			if ew != nil {
-				err = ew
-				break
-			}
-			if nr != nw {
-				err = io.ErrShortWrite
-				break
-			}
-		}
-		if er != nil {
-			if er != io.EOF {
-				err = er
-			}
-			break
-		}
-		if testCase5 {
-			return Metadata{}, testError
-		}
-	}
+	written, h, err := crc32Copy(sb._fd, r, -1)
 	if err != nil {
 		return Metadata{}, err
 	}
 
 	p := Metadata{
 		key:    key,
-		tstamp: uint32(time.Now().Unix()),
 		offset: v,
-		crc32:  h.Sum32(),
+		crc32:  h,
 	}
 
 	p.setKeyLen(keylen)
@@ -410,7 +378,7 @@ SYNC:
 
 // Flag flags the key using the callback function
 // This method may panic. If you recover, SueprBlock shall not be used any more
-func (sb *SuperBlock) Flag(key string, callback func(oldFlag uint64) (newFlag uint64)) (uint64, error) {
+func (sb *SuperBlock) Flag(key string, callback func(oldFlag uint32) (newFlag uint32)) (uint32, error) {
 	sb._lock.Lock()
 	defer sb._lock.Unlock()
 

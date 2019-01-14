@@ -14,29 +14,6 @@ func (sb *SuperBlock) Open(key string) (*Stream, error) {
 	sb._lock.RLock()
 	defer sb._lock.RUnlock()
 
-	load := func(node Metadata) (*Stream, error) {
-		d := &Stream{_super: sb}
-		if err := d.open(); err != nil {
-			return nil, err
-		}
-
-		if _, err := d._fd.Seek(node.offset, 0); err != nil {
-			return nil, err
-		}
-
-		if node.KeyLen() > 8 {
-			ln := int64(node.KeyLen())
-			if _, err := d._fd.Seek(ln, os.SEEK_CUR); err != nil {
-				return nil, err
-			}
-		}
-
-		d.h = crc32.NewIEEE()
-		d.Metadata = node
-		d.remaining = int(node.Len())
-		return d, nil
-	}
-
 	var err error
 	if sb.rootNode == 0 && sb._root == nil {
 		return nil, ErrKeyNotFound
@@ -54,8 +31,27 @@ func (sb *SuperBlock) Open(key string) (*Stream, error) {
 		return nil, err
 	}
 
-	//	sb._cache.Add(key, node)
-	return load(node)
+	d := &Stream{_super: sb}
+	if err := d.open(); err != nil {
+		return nil, err
+	}
+
+	if _, err := d._fd.Seek(node.offset, 0); err != nil {
+		return nil, err
+	}
+
+	if node.KeyLen() > 8 {
+		ln := int64(node.KeyLen())
+		if _, err := d._fd.Seek(ln, os.SEEK_CUR); err != nil {
+			return nil, err
+		}
+	}
+
+	d.h = crc32.NewIEEE()
+	d.Metadata = node
+	d.remaining = int(node.Len())
+	return d, nil
+
 }
 
 // Get returns bytes slice directly

@@ -151,7 +151,7 @@ func TestOpenStudFlag(t *testing.T) {
 	for i := 0; i < COUNT; i++ {
 		f.Create(strconv.Itoa(i), genReader(i))
 		m[strconv.Itoa(i)] = true
-		f.Flag(strconv.Itoa(i), func(uint64) uint64 { return uint64(i) })
+		f.Flag(strconv.Itoa(i), func(uint32) uint32 { return uint32(i) })
 	}
 	f.Close()
 
@@ -168,7 +168,7 @@ func TestOpenStudFlag(t *testing.T) {
 		if k != strconv.Itoa(int(x)) {
 			t.Error(k)
 		}
-		if v.Flag() != uint64(x) {
+		if v.Flag() != uint32(x) {
 			t.Error(k)
 		}
 		return nil
