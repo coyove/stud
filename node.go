@@ -148,20 +148,12 @@ func (n *nodeBlock) maybeSplitChild(i int) bool {
 	return true
 }
 
-func (n *nodeBlock) update(m Metadata, key uint128, keystr string, r io.Reader) error {
-	if m.KeyLen() != uint16(len(keystr)) {
-		panic("shouldn't happen")
-	}
-
-	return nil
-}
-
 // insert inserts an item into the subtree rooted at this node
 func (n *nodeBlock) insert(key uint128, keystr string, r io.Reader) error {
 	i, found := n.find(key)
 	//log.Println(n.children, n.items, item, i, found)
 	if found {
-		return n.update(n.items[i], key, keystr, r)
+		return ErrKeyExisted
 	}
 
 	if n.childrenSize == 0 {
@@ -181,7 +173,7 @@ func (n *nodeBlock) insert(key uint128, keystr string, r io.Reader) error {
 		case inTree.key.less(key):
 			i++ // we want second split node
 		default:
-			return n.update(n.items[i], key, keystr, r)
+			return ErrKeyExisted
 		}
 	}
 
@@ -258,7 +250,7 @@ func (n *nodeBlock) revertToLastSnapshot() {
 }
 
 // get finds the given key in the subtree and returns it.
-func (n *nodeBlock) getOrFlag(key uint128, callback func(uint32) uint32) (Metadata, error) {
+func (n *nodeBlock) getOrFlag(key uint128, callback func(uint64) uint64) (Metadata, error) {
 	i, found := n.find(key)
 	if found {
 		m := n.items[i]

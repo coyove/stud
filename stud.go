@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"hash"
-	"hash/crc32"
 	"hash/fnv"
 	"io"
 	"io/ioutil"
@@ -304,19 +303,4 @@ func (d *Stream) ReadAllAndClose() []byte {
 	buf, _ := ioutil.ReadAll(d)
 	d.Close()
 	return buf
-}
-
-func crc32Copy(w io.Writer, r io.Reader, n int64) (written int64, hash uint32, err error) {
-	h := crc32.NewIEEE()
-	w = io.MultiWriter(w, h)
-	if n == -1 {
-		written, err = io.Copy(w, r)
-	} else {
-		written, err = io.CopyN(w, r, n)
-	}
-	if testCase5 {
-		return 0, 0, testError
-	}
-	hash = h.Sum32()
-	return
 }
