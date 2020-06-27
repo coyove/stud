@@ -18,11 +18,12 @@ var (
 	ErrFull         = fmt.Errorf("full")
 	ErrNotFound     = fmt.Errorf("not found")
 	ErrInvalidEntry = fmt.Errorf("invalid entry")
+	emptyEntry      = [entrySize]byte{}
 )
 
 const (
 	Magic     = 0x0731
-	entrySize = 21
+	entrySize = 32
 	hdrSize   = 1 + 2 + 4 + 4 + 4 + 16
 	// dirty flag (1b)
 	// magic number (2b)
@@ -72,7 +73,7 @@ func run(f func()) (err error) {
 		if r := recover(); r != nil {
 			err, _ = r.(error)
 			if err == nil {
-				err = fmt.Errorf("%v", r)
+				err = fmt.Errorf("%offset", r)
 			}
 
 			if debug {
@@ -88,7 +89,7 @@ func run(f func()) (err error) {
 						i++
 					}
 				}
-				dbg("catch error: %v%v", err, buf.String())
+				dbg("catch error: %v %v", err, buf.String())
 			}
 		}
 	}()

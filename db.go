@@ -67,7 +67,7 @@ func (m *DB) Rebuild() error {
 				continue
 			}
 
-			uuid := m._seek(int64(e.v), 0)._read(new([16]byte)).([16]byte)
+			uuid := m._seek(int64(e.offset), 0)._read(new([16]byte)).([16]byte)
 			if uuid == m.uuid {
 				e.dib = 1
 				tmp._putEntry(e, false)
@@ -171,7 +171,7 @@ func (m *DB) Put(key string, r io.Reader) error {
 		m._write(uint64(nw))
 		m._writeDirty(true)
 		// fmt.Println(hash(key), hash64(key))
-		e := entry{1, hash(key), hash64(key), uint64(oldEOF)}
+		e := entry{dib: 1, hash: hash(key), k: hash64(key), offset: uint64(oldEOF), end: uint64(panicerr2(m.f.Seek(0, 2)).(int64))}
 		if err := run(func() { m._putEntry(e, true) }); err != nil {
 			if err == ErrFull {
 				m._writeDirty(false)
@@ -208,7 +208,7 @@ func (m *DB) _putEntry(e entry, limitedRealloc bool) {
 			goto EXECUTE_PLANS
 		}
 		if e.hash == bk.hash && e.k == bk.k {
-			bk.v = e.v
+			bk.offset = e.offset
 			m._writeBucket(i, bk)
 			goto EXECUTE_PLANS
 		}
@@ -256,7 +256,7 @@ func (m *DB) Get(key string) (*Reader, error) {
 				break
 			}
 			if bk.hash == hash && bk.k == hash64 {
-				if uuid := m._seek(int64(bk.v), 0)._read(new([16]byte)).([16]byte); uuid != m.uuid {
+				if uuid := m._seek(int64(bk.offset), 0)._read(new([16]byte)).([16]byte); uuid != m.uuid {
 					panic(ErrInvalidEntry)
 				}
 
@@ -278,7 +278,7 @@ func (m *DB) Range(cb func(*Reader) bool) error {
 				continue
 			}
 
-			if uuid := m._seek(int64(e.v), 0)._read(new([16]byte)).([16]byte); uuid != m.uuid {
+			if uuid := m._seek(int64(e.offset), 0)._read(new([16]byte)).([16]byte); uuid != m.uuid {
 				panic(ErrInvalidEntry)
 			}
 
