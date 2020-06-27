@@ -14,8 +14,8 @@ import (
 
 type DB struct {
 	f            File
-	wmu          sync.Mutex      // Put() locking
-	bmu          [256]sync.Mutex // bucket locks
+	wmu          sync.Mutex        // Put() locking
+	bmu          [256]sync.RWMutex // bucket locks
 	count        uint32
 	createTime   uint32
 	totalBuckets uint32
@@ -34,10 +34,7 @@ func Open(path string, length uint32) (*DB, error) {
 
 	m := &DB{f: f}
 	if fi, _ := f.Stat(); fi.Size() == 0 {
-		m.totalBuckets = 8
-		for m.totalBuckets < length {
-			m.totalBuckets *= 2
-		}
+		m.totalBuckets = length
 		m.createTime = uint32(time.Now().Unix())
 		rand.Read(m.uuid[:])
 		return m, m.marshalHeader()
@@ -93,6 +90,7 @@ func (m *DB) Rebuild() error {
 func (m *DB) marshalHeader() error {
 	return run(func() {
 		m._write(byte(0))
+		m._write(byte(0))
 		m._write(uint16(Magic))
 		m._write(m.totalBuckets)
 		m._write(m.count)
@@ -110,6 +108,7 @@ func (m *DB) unmarshalHeader() error {
 		if m._read(new(byte)).(byte) != 0 {
 			xerr = errDirty
 		}
+		m._read(new(byte))
 		mn := m._read(new(uint16)).(uint16)
 		if mn != Magic {
 			panic(fmt.Errorf("invalid header (magic)"))
@@ -123,8 +122,8 @@ func (m *DB) unmarshalHeader() error {
 }
 
 func (m *DB) _readBucket(i uint32) entry {
-	m.bmu[byte(i)].Lock()
-	defer m.bmu[byte(i)].Unlock()
+	m.bmu[byte(i)].RLock()
+	defer m.bmu[byte(i)].RUnlock()
 	m._seek(hdrSize+int64(i)*entrySize, 0)
 	return _unmarshalEntry(m.f)
 }
@@ -164,14 +163,15 @@ func (m *DB) Put(key string, r io.Reader) error {
 		m._write(uint32(len(key)))
 		m._write([]byte(key))
 		m._write(uint32(time.Now().Unix()))
-		lengthMark := panicerr2(m.f.Seek(0, 1)).(int64)
+		lengthMark := m._currentOffset()
 		m._write(uint64(0))
 		nw := panicerr2(io.Copy(m.f, r)).(int64)
+		endMark := m._currentOffset()
 		m._seek(lengthMark, 0)
 		m._write(uint64(nw))
 		m._writeDirty(true)
 		// fmt.Println(hash(key), hash64(key))
-		e := entry{dib: 1, hash: hash(key), k: hash64(key), offset: uint64(oldEOF), end: uint64(panicerr2(m.f.Seek(0, 2)).(int64))}
+		e := entry{dib: 1, hash: hash(key), k: hash64(key), offset: uint64(oldEOF), end: uint64(endMark)}
 		if err := run(func() { m._putEntry(e, true) }); err != nil {
 			if err == ErrFull {
 				m._writeDirty(false)
@@ -183,7 +183,7 @@ func (m *DB) Put(key string, r io.Reader) error {
 }
 
 func (m *DB) _putEntry(e entry, limitedRealloc bool) {
-	i := e.hash & (m.totalBuckets - 1)
+	i := e.hash % m.totalBuckets
 
 	ms := MaxSearch
 	if !limitedRealloc {
@@ -216,7 +216,7 @@ func (m *DB) _putEntry(e entry, limitedRealloc bool) {
 			plans = append(plans, plan{i, e})
 			e = bk
 		}
-		i = (i + 1) & (m.totalBuckets - 1)
+		i = (i + 1) % m.totalBuckets
 		e.dib++
 	}
 	panic(ErrFull)
@@ -249,7 +249,7 @@ func (m *DB) Get(key string) (*Reader, error) {
 	var r *Reader
 	err := run(func() {
 		hash, hash64 := hash(key), hash64(key)
-		i := hash & (m.totalBuckets - 1)
+		i := hash % m.totalBuckets
 		for dib := 1; ; dib++ {
 			bk := m._readBucket(i)
 			if int(bk.dib) < dib {
@@ -263,7 +263,7 @@ func (m *DB) Get(key string) (*Reader, error) {
 				r = m._makeReader()
 				return
 			}
-			i = (i + 1) & (m.totalBuckets - 1)
+			i = (i + 1) % m.totalBuckets
 		}
 		panic(ErrNotFound)
 	})
@@ -305,4 +305,8 @@ func (m *DB) _write(x interface{}) {
 func (m *DB) _seek(pos int64, w int) *DB {
 	panicerr2(m.f.Seek(pos, w))
 	return m
+}
+
+func (m *DB) _currentOffset() int64 {
+	return panicerr2(m.f.Seek(0, 2)).(int64)
 }

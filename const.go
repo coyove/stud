@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	debug           = os.Getenv("RBKVDBG") == "1"
+	debug           = os.Getenv("STUDBG") == "1"
 	MaxSearch       = 32
 	errDirty        = fmt.Errorf("dirty")
 	ErrFull         = fmt.Errorf("full")
@@ -24,8 +24,9 @@ var (
 const (
 	Magic     = 0x0731
 	entrySize = 32
-	hdrSize   = 1 + 2 + 4 + 4 + 4 + 16
+	hdrSize   = 1 + 1 + 2 + 4 + 4 + 4 + 16
 	// dirty flag (1b)
+	// reserve (1b)
 	// magic number (2b)
 	// total buckets (4b)
 	// bucket count (4b)

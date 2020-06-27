@@ -15,7 +15,7 @@ func TestDB(t *testing.T) {
 	rand.Seed(time.Now().Unix())
 
 	dbg("stage 1")
-	m, err := Open("test.db", 128)
+	m, err := Open("test.db", 1<<12)
 	panicerr(err)
 
 	x := map[int]int{}
@@ -59,5 +59,4 @@ func TestDB(t *testing.T) {
 	panicerr(err)
 
 	m.Close()
-	os.Remove("test.db")
 }
